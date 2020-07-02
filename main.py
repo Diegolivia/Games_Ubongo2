@@ -1,8 +1,10 @@
 import pyglet
 from pyglet.window import key
 from pyglet.window import FPSDisplay
+from pyglet.window import mouse
 from random import randint, choice
 import random as rand
+import linecache
 import os
 import sys
 
@@ -10,7 +12,6 @@ window = pyglet.window.Window(1600, 1024)
 fps_display = FPSDisplay(window)
 fps_display.label.font_size = 50
 COUNTDOWN = int(1)
-
 
 class Timer(object):
     def __init__(self, itb):
@@ -36,7 +37,6 @@ class Timer(object):
             if m < 0:
                 self.running = False
                 self.label.text = 'STOP'
-
 
 class Table:
     def __init__(self, numP, X, Y, imgTab, mtG, mtP, arrP):
@@ -128,7 +128,6 @@ class Table:
                     self.mtx_Tab[player.Position][i+2], self.mtx_Tab[player.Position][i+3], i+2]
         pass
 
-
 class Player:
     def __init__(self, turn, position, color):
         self.posMove = 0
@@ -175,7 +174,6 @@ class Player:
             label.draw()
         pass
 
-
 class AIPlayer(Player):
     def __init__(self, turn, position, color, diff):
         self.Difficulty = diff
@@ -187,7 +185,6 @@ class AIPlayer(Player):
 
     def DecidirMovimiento(self):
         pass
-
 
 class Dice:
     def __init__(self, iDice, mtDadCar):
@@ -211,21 +208,19 @@ class Dice:
         sprFace.draw()
         pass
 
-
 class MiniGame:
-    def __init__(self):
+    def __init__(self,mPZ):
+        #Crea y Carga las Piezas con las que se construira las plantillas
         self.arr_Pieces = []
         self.LoadPieces()
-        self.arr_Plantilla = [
-            [0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0]
-        ]
+        #Carga las imagenes para poder dibujar los objetos
+        self.arr_img_Piezas = mPZ
+        #Genera las Plantillas utilizando las piezas entregadas
         self.GenerateTemplate()
-        self.base_Plantilla = []
+        #Carga la plantilla Actual Para Jugar
+        #Del arreglo: currMinigame[0]=template currMinigame[1]=array de Piezas
+        self.currMinigame = []
+        self.LoadTemplate(1)
         pass
 
     def LoadPieces(self):
@@ -237,6 +232,25 @@ class MiniGame:
                 for x in range(len(l)):
                     l[x] = list(map(int, l[x].split(',')))
                 self.arr_Pieces.append(l)
+        pass
+
+    def LoadTemplate(self,turno):
+        txtTemplate = "res/data/Plantilla.txt"
+        txtPieces = "res/data/PlantillaPieces.txt"
+        self.currMinigame=[]
+        l=linecache.getline(txtTemplate,turno)
+        l=l.strip().split('.')
+        for x in range(len(l)):
+            l[x]=list(map(int,l[x].split(',')))
+        pass
+        self.currMinigame.append(l)
+        a=linecache.getline(txtPieces,turno)
+        a=a.strip().split('/')
+        for x in range(len(a)):
+            a[x]=a[x].split('.')
+            for y in range(len(a[x])):
+                a[x][y]=list(map(int,a[x][y].split(',')))
+        self.currMinigame.append(a)
         pass
 
     def GenerarPlantilla(self, aP):
@@ -332,20 +346,53 @@ class MiniGame:
                             line = list(map(str, row))
                             fP.write(",".join(line)+".")
                         fP.write(",".join(list(map(str, piece[len(piece)-1])))+"/")
-                    line=list(map(str, TempP[len(TempP)-1]))
-                    fP.write(",".join(line))
-                    fP.write("/"+"\n")
+                    for pieceF in TempP[len(TempP)-1][:2]:
+                        line = list(map(str, pieceF))
+                        fP.write(",".join(line)+".")
+                    line = list(map(str, TempP[len(TempP)-1][2]))
+                    fP.write(",".join(line)+"\n")
                 pass
 
-    def Mostrar(self):
+    def Dibujar(self):
+        mx=self.currMinigame[0]
+        for x in range(len(mx)):
+            for y in range(len(mx)):
+                f=pyglet.sprite.Sprite(self.arr_img_Piezas[mx[y][x]],1260+50*x,600-60*y)
+                f.scale_y=0.6
+                f.scale_x=0.5
+                f.draw()
+        ap=self.currMinigame[1]
+        PieceX=850
+        PieceY=600
+        for curr in range(len(ap)):
+            for x in range(len(ap[curr])):
+                for y in range(len(ap[curr])):
+                    if(ap[curr][y][x]==1):
+                        f=pyglet.sprite.Sprite(self.arr_img_Piezas[2],PieceX+50*x,PieceY-60*y)
+                        f.scale_y=0.6
+                        f.scale_x=0.5
+                        f.draw()
+            if(curr==0 or curr==2):
+                PieceX+=160
+            elif curr==1:
+                PieceX=850
+                PieceY-=190
+
+            
+        pass
+    
+    def Revisar(self):
+        #Comprobar si ganaste
         pass
 
-
 class GameEngine:
-    def __init__(self, nPl, nHu, mG, mP, mPH, mD, iTab, iDice, iTesoro, iButton):
+    def __init__(self, nPl, nHu, mG, mP, mPH, mD,mPZ, iTab, iDice, iTesoro, iButton,iTimer,iMenu):
         super().__init__()
+        #GameState=0 es menu, GameState=1 es jugando
+        self.GameState=0
         self.Ronda = 0
         self.Turno = 0
+        self.numMinigame=1
         # Setup de Jugadores
         self.numPlayers = nPl
         self.numHuman = nHu
@@ -382,6 +429,14 @@ class GameEngine:
         # Tablero --> Tamaño del Table --> 1601*346 aprox
         self.objTable = Table(nPl, 0, 679, iTab, mG,
                               self.mtxP, self.arrPlayers)
+        #Minigame-Piezas
+        self.objMinigame = MiniGame(mPZ)
+        #Timer
+        self.timer = Timer(iTimer)
+        #Arreglo para el minijuego
+        self.arr_Play_Timer=[0,0,0,0]
+        #Menu
+        self.sprMenu=pyglet.sprite.Sprite(iMenu)
 
     def PopulatePlayers(self, mP, mPH):
         for i in range(self.numHuman):
@@ -401,20 +456,31 @@ class GameEngine:
         pass
 
     def Dibujar(self):
-        # Tablero
-        self.objTable.Dibujar()
-        # Dado
-        self.objDice.Dibujar()
-        # Ubongo boton
-        self.sprButton.draw()
-        # Mochila
-        self.sprTesoro.draw()
-        self.arrPlayers[self.Turno].Dibujar(self.mtxGem)
-        # Visualizador
-        self.lblRonda.draw()
-        self.lblTurn.draw()
-        self.lblMov.draw()
-        self.lblTurnH.draw()
+        if(self.GameState==0):
+            self.sprMenu.draw()
+            pass
+        else:
+            # Tablero
+            self.objTable.Dibujar()
+            # Dado
+            self.objDice.Dibujar()
+            # Ubongo boton
+            self.sprButton.draw()
+            # Mochila
+            self.sprTesoro.draw()
+            self.arrPlayers[self.Turno].Dibujar(self.mtxGem)
+            # Visualizador
+            self.lblRonda.draw()
+            self.lblTurn.draw()
+            self.lblMov.draw()
+            self.lblTurnH.draw()
+            #Minijuego
+            self.objMinigame.Dibujar()
+            #Timer
+            self.timer.sprTimer.draw()
+            self.timer.label.draw()
+            if(not self.timer.running):
+                self.PerderTurno()
 
     def UpdateLabels(self):
         self.lblRonda.text = 'RONDA: '+str(self.Ronda)
@@ -436,9 +502,51 @@ class GameEngine:
             self.UpdateLabels()
         pass
 
-    def Revisar(self):
+    def CambiarRonda(self):
+        self.Ronda+=1
+        self.Turno=0
+        mov=3
+        for au in range(3):
+            may=0
+            aux=0
+            for x in range(self.numPlayers):
+                if(self.arr_Play_Timer[x]>may):
+                    may=self.arr_Play_Timer[x]
+                    aux=x
+            self.arr_Play_Timer[aux]=0
+            self.arrPlayers[aux].SetMovimientos(mov)
+            if(mov!=0):
+                mov-=1
+        self.arr_Play_Timer = [0,0,0,0]
         pass
 
+    def GanarTurno(self):
+        self.arr_Play_Timer[self.Turno]=self.timer.time
+        self.RotarTurno()
+        pass
+
+    def PerderTurno(self):
+        self.arr_Play_Timer[self.Turno]=0
+        self.RotarTurno()
+
+    def RotarTurno(self):
+        self.objDice.TirarDice();
+        self.Turno+=1
+        self.numMinigame+=1
+        if(self.numMinigame>36):
+            self.numMinigame=0
+        if(self.Turno==self.numPlayers):
+            self.CambiarRonda()
+        self.objMinigame.LoadTemplate(self.numMinigame)
+        self.UpdateLabels()
+        self.timer.reset()
+        pass
+    
+    def iniciarGame(self):
+        self.GameState=1
+
+    def Revisar(self):
+        pass
 
 # Cargar Las imagenes ---> Modificar para cargar un res library
 imgBackground = pyglet.image.load('res\img\Background.png')
@@ -473,6 +581,10 @@ imgSide7 = pyglet.image.load('res\img\Dado\Dado7.png')
 imgSide8 = pyglet.image.load('res\img\Dado\Dado8.png')
 imgButton = pyglet.image.load('res\img\Button.png')
 imgTimer = pyglet.image.load('res\img\Timer.png')
+imgPiezaNegra = pyglet.image.load('res\img\Piezas\PiezaNegra.png')
+imgPiezaBlanca = pyglet.image.load('res\img\Piezas\PiezaBlanca.png')
+imgPiezaRoja = pyglet.image.load('res\img\Piezas\PiezaRoja.png')
+imgMenu=pyglet.image.load('res\img\Main.png')
 
 mtx_Gem = [imgGem1, imgGem2, imgGem3, imgGem4, imgGem5, imgGem6]
 mtx_Player = [imgPlayer5, imgPlayer1, imgPlayer3, imgPlayer4, imgPlayer2]
@@ -480,36 +592,28 @@ mtx_Dice = [imgSide1, imgSide5, imgSide2, imgSide3,
             imgSide4, imgSide6, imgSide7, imgSide8]
 mtx_PlayerHead = [imgPlayer5Head, imgPlayer1Head,
                   imgPlayer3Head, imgPlayer4Head, imgPlayer2Head]
+mtx_Piezas = [imgPiezaNegra,imgPiezaBlanca,imgPiezaRoja]
 
 sprBck = pyglet.sprite.Sprite(imgBackground, 0, 0)
-engine = GameEngine(4, 4, mtx_Gem, mtx_Player, mtx_PlayerHead, mtx_Dice,
-                    imgTable, imgDice, imgTesoro, imgButton)
-
-mini = MiniGame()
+engine = GameEngine(4, 4, mtx_Gem, mtx_Player, mtx_PlayerHead, mtx_Dice,mtx_Piezas,
+                    imgTable, imgDice, imgTesoro, imgButton,imgTimer,imgMenu)
 
 clock = pyglet.clock.Clock()
-timer = Timer(imgTimer)
 
+def draw_rect(x, y, width, height):
+    pyglet.graphics.draw(4, pyglet.gl.GL_QUADS,
+        ('v2f', [x, y, x + width, y, x + width, y + height, x, y + height]))
 
 @window.event
 def on_key_press(symbol, modifiers):
-    if symbol == key.Q:
-        engine.SetTurno(0)
-    elif symbol == key.W:
-        engine.SetTurno(1)
-    elif symbol == key.E:
-        engine.SetTurno(2)
-    elif symbol == key.R:
-        engine.SetTurno(3)
-    elif symbol == key.T:
+    if symbol == key.W:
         engine.MoverPersonaje(1)
-    elif symbol == key.G:
+    elif symbol == key.S:
         engine.MoverPersonaje(-1)
     elif symbol == key.P:
-        engine.objDice.TirarDice()
+        engine.PerderTurno()
     elif symbol == key.O:
-        engine.Revisar()
-
+        engine.GanarTurno()
 
 @window.event
 def on_draw():
@@ -517,9 +621,14 @@ def on_draw():
     sprBck.draw()
     engine.Dibujar()
     fps_display.draw()
-    timer.sprTimer.draw()
-    timer.label.draw()
-
-
-pyglet.clock.schedule_interval(timer.update, 1)
+    
+@window.event
+def on_mouse_press(x, y, button, modifiers):
+    if button == mouse.LEFT and engine.GameState==1:
+        if((x>=350 and x<=820) and (y>=70 and y<=220)):
+            engine.GanarTurno()
+    if button == mouse.LEFT and engine.GameState==0:
+        if((x>=350 and x<=920) and (y>=100 and y<=420)):
+            engine.iniciarGame()
+pyglet.clock.schedule_interval(engine.timer.update, 1)
 pyglet.app.run()
